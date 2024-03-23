@@ -1,0 +1,17 @@
+from sympy.integrals import laplace_transform, inverse_laplace_transform
+from sympy.abc import x, s
+from sympy import Symbol, exp
+#I) Considerando un PVI de la forma: "ay′′(x) + by′(x) + cy(x) = f(x)---> y(0) = y0, y′(0) = y1", Se debe comenzar con un for que te pida cada una de las variables (a,b,c,f(x),y0,y1). Luego (esto no va al código), se usa laplace en la EDO, quedando : "F(s)=a*s^2*Y(s)-a*s*y0-a*y1+b*s*Y(s)-b*y0+c*Y(s)". De esto, despejo Y(s) al igual que en la EDO de orden 1, pero en este caso queda "Y(s)=(F(s)+a*s*y0+a*y1+b*y0)/(a*s^2+b*s+c)". Volviendo a programar, ya tengo las variables a,b,c,y0,y1 y f(x). Uso laplace en f(x) para obtener mi F(s), de la siguiente forma: "fs = laplace_transform(fx, x, s, noconds=True)", luego, utilizando el Y(s) que despejé anteriormente, lo escribo como función (que depende de a,b,c,y0,y1 y de F(s), todos datos que ya tengo), quedando: "Ys=(a*s*y0+a*yp0+b*y0+fs)/(a*s**2+b*s+c)". Por último, como ya tengo mi Y(s), utilizo la antitransformada de laplace sobre Y(s) para obtener la solución de la EDO (y(x)), de la forma "yx = inverse_laplace_transform(Ys, s, x)". Por último, hago "print(yx)" para printear la solución. Otra forma de hacerlo sin darle valores a "a,b,c,y0,y1" es de forma genérica, con "a,b,c,y0,y1=Symbol("a"),Symbol("b"),Symbol("c"),Symbol("y0"),Symbol("y1")" y definir a f(x) como "fx=Function("f")(x)". al operar esto nos va a dar una solución genérica sin valores numéricos.
+
+a =3
+b =-2
+c=-1
+fx =4*exp(-x)
+y0 =4
+yp0=-4
+fs = laplace_transform(fx, x, s, noconds=True)
+Ys = (a*s*y0+a*yp0+b*y0+fs)/(a*s**2+b*s+c)
+yx = inverse_laplace_transform(Ys, s, x)
+print(f"La solución a la EDO de orden 2 es:\n{yx}")
+
+#III) El solver se diferencia del solver2 en la cantidad de variables a definir (se agrega una condición inicial y una variable por el incremento de orden), pero lo más importante es el cambio en la función Ys, que ahora, al ser de orden 2, cambia de la forma "Ys = a*y0/(a*s+b) + fs/(a*s+b)" a "Ys = (a*s*y0+a*yp0+b*y0+fs)/(a*s**2+b*s+c)", haciendo uso de las nuevas variables.  Para crear un programa genérico, primero defino la función y las condiciones iniciales, dandole a cada valor multiplicado a cada derivada de "y" una letra (a2y´´+a1y´+a0y por ejemplo). Luego, se le aplica laplace a toda la función (usando el teorema de la transformada de la derivada con las derivadas de y). Esto me va a permitir despejar Y(s)(aún no es código, es teoría), la cual podría definir como una función.(siendo "a0" el que acompaña a "y", "a1" a "y´"..., y siendo y0, y1, y2... yn las cond iniciales). La función queda: Y(s)=(F(s)+a1*y0+a2*s*y0+a2*y1+a3*(s**2)*y0+a3*s*y1+a3*y2+a4*(s**3)*y0+a4*(s**2)*y1+a4*s*y2+a4*y3... +an*(s**n-1)*y0+an*(s**n-2)*y1... +an*y(n-1))/(an*(s**n)+a(n-1)*(s**n-1)...+a1*s+a0). Por último, al armar el código, defino los parámetros en un for para el grado de la función, creando tantos parámetros a como el orden de la EDO+1 y tantas condiciones iniciales yn como el orden de la EDO. Luego, se debe ingresar el fx y se le aplica transformada de laplace al fx (con laplace_transform(fx, x, s, noconds=True)) creando una nueva variable llamada F(s). En tercer lugar, se define la función Y(s) como se hizo anteriormente con un for. En cuarto lugar, se crea la variable yx, siendo esta la antitransformada de Y(s) (usando inverse_laplace_transform(Ys, s, x)), para finalmente hacer el print de yx, siendo esta la solución de nuestra EDO de orden n.
