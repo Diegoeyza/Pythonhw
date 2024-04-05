@@ -1,6 +1,7 @@
 class Directory:
     def __init__(self):
         self.Dict={"Project":[],"File":[],"Changes":[],"Checkpoint":[]}
+        self.pos=0
 
 
     def New_project(self,name,file):
@@ -8,6 +9,8 @@ class Directory:
         (self.Dict["File"]).append(file)
         (self.Dict["Checkpoint"]).append(file)
         (self.Dict["Changes"]).append("Changes:")
+    def pos(self,name):
+        self.pos=self.Dict["Project"].index(name)
 
 
     
@@ -23,4 +26,9 @@ class Directory:
 diccionario=Directory()
 diccionario.New_project("proyecto1","caca.jpeg")
 diccionario.Change("Pixelated","yo.jpg",0)
+print(diccionario.Dict["Project"][0])
 diccionario.print()
+print(len(diccionario.Dict["Project"]))
+print(diccionario.Dict["Project"].index("proyecto1"))
+
+
