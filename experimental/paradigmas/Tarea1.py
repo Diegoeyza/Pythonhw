@@ -111,6 +111,7 @@ class Paste_Y(Project):
 
 exit=0
 Dir=Directory()
+Dir=Directory()
 while (exit==0):
     entry=""
     entry=input(f"\nWelcome to Pillow Image editor, please select one of the following commands:\n-To start a project, type 0\n-To work on an existing project, type 1\n-To show an image from a project, type 2\n-To close the editor, type END\n")
