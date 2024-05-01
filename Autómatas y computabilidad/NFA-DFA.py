@@ -1,4 +1,4 @@
-file=open("C:\\Users\\diego\\Github\\Pythonhw\\Autómatas y computabilidad\\nfa4.txt","r")
+file=open(input("Please enter the path to the file to load:\n-> "),"r")
 line=[]
 data=[]
 initial_states=[]
@@ -92,7 +92,7 @@ while (lenght!=len(chart2)):            #verifico que siga en el ciclo while sie
         for j in range (1, len(chart2[i])):
             if chart2[i][j] not in data2 and chart2[i][j]!="":          #verifico si esque hay algún estado nuevo y si esque lo hay, lo agrego a mi chart2, haciendo que se realice un ciclo más del while
                 chart2.append([chart2[i][j]])
-file = open("C:\\Users\\diego\\Github\\Pythonhw\\Autómatas y computabilidad\\dfa4.txt","w")     #creo o edito el archivo en el cual voy a escribir todos los datos
+file = open("dfa4.txt","w")     #creo o edito el archivo en el cual voy a escribir todos los datos
 file.write("Estados\n")
 used=[]
 for i in data2:                 #verifico si los datos están en las listas guardadas inicialmente para ver si alguno es estado inicial, cuales son estados finales, y cuales son intermedios, a medida que voy llenando una lista que me indica cuales ya anoté para no repetirlos
