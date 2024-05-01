@@ -1,3 +1,5 @@
+#instrucciones: El usuario debe dar el archivo a leer con su path o relative path, y luego al correr el programa se genera automáticamente el achivo dfa4.txt con la solución
+
 file=open(input("Please enter the path to the file to load:\n-> "),"r")
 line=[]
 data=[]
@@ -26,7 +28,6 @@ while line!='':             #guardo todos los datos en su lista correspondiente,
     if counter==2 and "Transiciones" not in line: alphabet.append(line.replace("\n","")) 
     if counter==3 and line!="": transitions.append(line.replace("-> ","").replace("\n",""))
 file.close()
-
 
 chart=[]        #guardo las relaciones entre los estados y el alfabeto
 chart2=[]       #guardo todas las tablas que no sean las hechas con los datos originales de estados
@@ -117,7 +118,7 @@ file.write("Alfabeto\n")
 for i in alphabet:
     file.write(f'{i}\n')
 file.write("Transiciones\n")
-for i in range (1,len(chart2)):          #itero a partir de 1 porque el 0 son los valores del alfabeto
+for i in range (1,len(chart2)):          #itero a partir de 1 porque el 0 son los valores del alfabeto y escribo todas las transiciones usando el chart2 que ya las tiene ordenadas
     file.write("{")
     file.write(chart2[i][0])
     file.write("} ")
@@ -136,28 +137,4 @@ for i in range (1,len(chart2)):          #itero a partir de 1 porque el 0 son lo
     file.write(chart2[i][2])
     file.write("}\n")
 
-
-
-
-
-    
-    
-
 file.close()
-        
-
-
-
-
-
-
-                        
-
-                            
-
-
-    
-
-
-
-
