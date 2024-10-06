@@ -49,7 +49,7 @@ def plot_fft(time, voltages1, voltages2=None, channel1='CH1', channel2='CH2'):
         plt.plot(xf, amplitudes2, label=channel2)
 
         # Determine the maximum frequency to set x-axis limit
-        max_freq = max(max_freq1, max_freq2)
+        max_freq = 250#max(max_freq1, max_freq2)
     else:
         # Set the x-axis limit to 10 times the max frequency for a single channel
         max_freq = max_freq1
@@ -60,13 +60,13 @@ def plot_fft(time, voltages1, voltages2=None, channel1='CH1', channel2='CH2'):
     # Plot settings
     plt.title('FFT of Voltage')
     plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Amplitude (Vpp)')
+    plt.ylabel('Amplitude (V)')
     plt.grid(True)
     plt.legend()
     plt.show()
 
 # Step 1: Load the data from CSV
-filename = r"experimental\electronica\SDS00005.CSV"
+filename = r"experimental\electronica\SDS00009.CSV"
 df = pd.read_csv(filename, skiprows=1)
 
 # Step 2: Choose which channels to analyze
