@@ -66,7 +66,7 @@ def plot_fft(time, voltages1, voltages2=None, channel1='CH1', channel2='CH2'):
     plt.show()
 
 # Step 1: Load the data from CSV
-filename = r"experimental\electronica\SDS00009.CSV"
+filename = r"C:\Users\diego\Github\ECG_project\ECG normal.CSV"
 df = pd.read_csv(filename, skiprows=1)
 
 # Step 2: Choose which channels to analyze
