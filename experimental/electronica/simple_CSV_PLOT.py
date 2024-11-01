@@ -4,7 +4,7 @@ from scipy.interpolate import make_interp_spline
 import numpy as np
 
 # Load the data from the CSV file
-file_path = r"experimental\electronica\SDS00006.CSV"
+file_path = r"C:\Users\diego\Downloads\ABC16.CSV"
 data = pd.read_csv(file_path, skiprows=1)  # Skip the header row with 'Second,Volt,Volt'
 
 # Strip any leading or trailing whitespace from column names
