@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize import root_scalar
+from scipy.interpolate import interp1d
 
 def load_data(file_path):
     data = {}
@@ -199,9 +201,9 @@ def estimate_max_vgs_before_triode(data, rd, vth, vdd):
     """
     max_vgs = None
 
-    # Recta de carga
-    x_load = np.linspace(0, vdd, 100)
-    y_load = (vdd - x_load) / rd if rd != float('inf') else np.zeros_like(x_load)
+    # Generate a fine-resolution load line
+    vds_load = np.linspace(0, vdd, 1000)
+    ids_load = (vdd - vds_load) / rd if rd != float('inf') else np.zeros_like(vds_load)
 
     for vgs, values in sorted(data.items()):
         if vgs <= vth:
@@ -210,42 +212,312 @@ def estimate_max_vgs_before_triode(data, rd, vth, vdd):
         vds_values = np.array(values['vds'])
         ids_values = np.array(values['ids'])
         
-        # Calculate the critical Vds for this Vgs
-        critical_vds = vgs - vth
-        if critical_vds < 0:
-            continue  # Skip invalid critical Vds
+        # Define the difference function to find the intersection
+        def difference(vds):
+            ids_device = np.interp(vds, vds_values, ids_values)
+            ids_loadline = np.interp(vds, vds_load, ids_load)
+            return ids_device - ids_loadline
 
-        # Interpolate Ids at the critical Vds
-        if np.min(vds_values) <= critical_vds <= np.max(vds_values):
-            ids_critical = np.interp(critical_vds, vds_values, ids_values)
+        # Find the intersection point using numerical root-finding
+        try:
+            result = root_scalar(difference, bracket=(0, vdd), method='brentq')
+            if result.converged:
+                vds_intersect = result.root
+                ids_intersect = np.interp(vds_intersect, vds_values, ids_values)
 
-            # Check if the critical point lies on the load line
-            ids_load = np.interp(critical_vds, x_load, y_load)
-            if np.isclose(ids_critical, ids_load, atol=1e-2):  # Allow a small tolerance
-                max_vgs = vgs
-                print(f"Critical Vgs = {max_vgs:.2f} V")
-                print(f"Critical Vds = {critical_vds:.2f} V, Ids = {ids_critical:.2f} A")
+                # Verify if the intersection is in the triode region
+                if vds_intersect < (vgs - vth):
+                    # Calculate slope to confirm triode
+                    idx = np.searchsorted(vds_values, vds_intersect)
+                    if idx < len(vds_values) - 1:
+                        slope = (ids_values[idx + 1] - ids_values[idx]) / (vds_values[idx + 1] - vds_values[idx])
+                        if slope > 0:
+                            max_vgs = vgs
+                            print(f"Critical Vgs = {max_vgs:.2f} V")
+                            print(f"Critical Vds = {vds_intersect:.2f} V, Ids = {ids_intersect:.2f} A")
 
-                # Plot the curves and critical point
-                plt.figure(figsize=(10, 6))
-                for vgs_key, curve in sorted(data.items()):
-                    plt.plot(curve['vds'], curve['ids'], label=f"Vgs = {vgs_key:.2f} V")
-                
-                plt.plot(x_load, y_load, 'r--', label="Recta de Carga")
-                plt.scatter([critical_vds], [ids_critical], color='orange', zorder=5,
-                            label=f"Critical Point (Vgs={max_vgs:.2f}V, Vds={critical_vds:.2f}V)")
-                
-                plt.xlabel('Vds (V)')
-                plt.ylabel('Ids (A)')
-                plt.title('Recta de Carga y Punto Crítico')
-                plt.legend(loc='upper right', fontsize='small', frameon=True)
-                plt.grid(True)
-                plt.tight_layout()
-                plt.show()
-                return max_vgs
+                            # Plot the curves and critical point
+                            plt.figure(figsize=(10, 6))
+                            for vgs_key, curve in sorted(data.items()):
+                                plt.plot(curve['vds'], curve['ids'], label=f"Vgs = {vgs_key:.2f} V")
+                            
+                            plt.plot(vds_load, ids_load, 'r--', label="Recta de Carga")
+                            plt.scatter([vds_intersect], [ids_intersect], color='orange', zorder=5,
+                                        label=f"Critical Point (Vgs={max_vgs:.2f}V, Vds={vds_intersect:.2f}V)")
+                            
+                            plt.xlabel('Vds (V)')
+                            plt.ylabel('Ids (A)')
+                            plt.title('Recta de Carga y Punto Crítico')
+                            plt.legend(loc='upper right', fontsize='small', frameon=True)
+                            plt.grid(True)
+                            plt.tight_layout()
+                            plt.show()
+                            return max_vgs
+        except ValueError:
+            # Skip if no valid intersection is found in the bracket range
+            pass
 
     print("No se encontró un valor crítico de Vgs antes de entrar en la región de triodo.")
     return max_vgs
+
+def calculate_max_vgs_with_loadline(data, rd, vth, vdd, q_point):
+    """
+    Calculate the maximum Vgs before entering the triode region by generating 
+    interpolated Vgs curves. Ensures Point B is valid with respect to the load line.
+    """
+    import numpy as np
+    from scipy.interpolate import interp1d
+    from scipy.optimize import root_scalar
+
+    vds_q, ids_q, vgs_q = q_point
+    vgs_values = sorted(data.keys())
+    current_idx = vgs_values.index(vgs_q)
+    
+    # Initial points and data for curves
+    current_curve = vgs_values[current_idx]
+    vds_current = np.array(data[current_curve]['vds'])
+    ids_current = np.array(data[current_curve]['ids'])
+
+    # Function to find the saturation transition (triode -> saturation)
+    def find_transition(vds, ids):
+        slopes = np.gradient(ids, vds)
+        transition_idx = np.argmax(slopes <= 0)
+        return vds[transition_idx], ids[transition_idx]
+
+    # Find Point A
+    point_a_vds, point_a_ids = find_transition(vds_current, ids_current)
+
+    # Load line calculation
+    vds_load = np.linspace(0, vdd, 1000)
+    ids_load = (vdd - vds_load) / rd if rd != float('inf') else np.zeros_like(vds_load)
+
+    def is_valid_point(vds_point, ids_point):
+        # Check if the load line at the given Vds is to the left of the point
+        ids_at_vds = np.interp(vds_point, vds_load, ids_load)
+        return ids_at_vds <= ids_point
+
+    # Iterate over higher Vgs values to find a valid Point B
+    for next_idx in range(current_idx + 1, len(vgs_values)):
+        next_curve = vgs_values[next_idx]
+        vds_next = np.array(data[next_curve]['vds'])
+        ids_next = np.array(data[next_curve]['ids'])
+
+        # Find Point B
+        point_b_vds, point_b_ids = find_transition(vds_next, ids_next)
+
+        if is_valid_point(point_b_vds, point_b_ids):
+            break  # Found a valid Point B
+        else:
+            # Redefine Point A as Point B and continue
+            point_a_vds, point_a_ids = point_b_vds, point_b_ids
+            vds_current, ids_current = vds_next, ids_next
+    else:
+        raise ValueError("Could not find a valid Point B in the available data.")
+
+    # Generate artificial curves between Point A and Point B
+    vgs_steps = np.linspace(current_curve, next_curve, num=200)
+    artificial_curves = []
+
+    for step, vgs_interpolated in enumerate(vgs_steps[1:], start=1):
+        alpha = step / len(vgs_steps)
+        vds_interpolated = np.linspace(0, vdd, len(vds_current))  # Generate Vds grid
+        ids_interpolated = (
+            (1 - alpha) * np.interp(vds_interpolated, vds_current, ids_current) +
+            alpha * np.interp(vds_interpolated, vds_next, ids_next)
+        )
+        artificial_curves.append((vgs_interpolated, vds_interpolated, ids_interpolated))
+
+    # Determine the last artificial curve in saturation region
+    vgs_critical = None
+    intersection_point = None
+
+    for vgs_interpolated, vds_interpolated, ids_interpolated in artificial_curves:
+        # Intersect with load line
+        def difference(vds):
+            ids_device = np.interp(vds, vds_interpolated, ids_interpolated)
+            ids_loadline = np.interp(vds, vds_load, ids_load)
+            return ids_device - ids_loadline
+
+        try:
+            result = root_scalar(difference, bracket=(0, vdd), method='brentq')
+            if result.converged:
+                vds_intersect = result.root
+                ids_intersect = np.interp(vds_intersect, vds_interpolated, ids_interpolated)
+
+                # Check if intersection point is in saturation
+                if vds_intersect >= (vgs_interpolated - vth):
+                    vgs_critical = vgs_interpolated
+                    intersection_point = (vds_intersect, ids_intersect)
+                else:
+                    break
+        except ValueError:
+            pass
+
+    # Plot all curves, including artificial and original
+    plt.figure(figsize=(10, 6))
+    
+    # Original Vgs curves
+    for vgs, curve in sorted(data.items()):
+        plt.plot(curve['vds'], curve['ids'], label=f"Original Vgs = {vgs:.2f} V")
+    
+    # Artificial curves
+    for vgs_interpolated, vds_interpolated, ids_interpolated in artificial_curves:
+        plt.plot(vds_interpolated, ids_interpolated, '--')
+    
+    # Load line
+    plt.plot(vds_load, ids_load, 'r--', label="Load Line")
+    
+    # Mark intersection point
+    if intersection_point:
+        plt.scatter([intersection_point[0]], [intersection_point[1]], color='orange', zorder=5,
+                    label=f"Critical Point (Vgs={vgs_critical:.2f}V, Vds={intersection_point[0]:.2f}V)")
+    
+    plt.xlabel('Vds (V)')
+    plt.ylabel('Ids (A)')
+    plt.title('Interpolated Vgs Curves and Load Line Intersection')
+    plt.legend(loc='upper right', fontsize='small', frameon=True)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    print(f"Critical Vgs = {vgs_critical:.2f} V")
+    return vgs_critical
+
+
+def calculate_max_vgs_with_loadline_focused(data, rd, vth, vdd, q_point):
+    """
+    Calculate the maximum Vgs before entering the triode region by generating 
+    interpolated Vgs curves. Ensures Point B is valid with respect to the load line.
+    Only plots the selected artificial curve with the original curves.
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.interpolate import interp1d
+    from scipy.optimize import root_scalar
+
+    vds_q, ids_q, vgs_q = q_point
+    vgs_values = sorted(data.keys())
+    current_idx = vgs_values.index(vgs_q)
+    
+    # Initial points and data for curves
+    current_curve = vgs_values[current_idx]
+    vds_current = np.array(data[current_curve]['vds'])
+    ids_current = np.array(data[current_curve]['ids'])
+
+    # Function to find the saturation transition (triode -> saturation)
+    def find_transition(vds, ids):
+        slopes = np.gradient(ids, vds)
+        transition_idx = np.argmax(slopes <= 0)
+        return vds[transition_idx], ids[transition_idx]
+
+    # Find Point A
+    point_a_vds, point_a_ids = find_transition(vds_current, ids_current)
+
+    # Load line calculation
+    vds_load = np.linspace(0, vdd, 1000)
+    ids_load = (vdd - vds_load) / rd if rd != float('inf') else np.zeros_like(vds_load)
+
+    def is_valid_point(vds_point, ids_point):
+        # Check if the load line at the given Vds is to the left of the point
+        ids_at_vds = np.interp(vds_point, vds_load, ids_load)
+        return ids_at_vds <= ids_point
+
+    # Iterate over higher Vgs values to find a valid Point B
+    for next_idx in range(current_idx + 1, len(vgs_values)):
+        next_curve = vgs_values[next_idx]
+        vds_next = np.array(data[next_curve]['vds'])
+        ids_next = np.array(data[next_curve]['ids'])
+
+        # Find Point B
+        point_b_vds, point_b_ids = find_transition(vds_next, ids_next)
+
+        if is_valid_point(point_b_vds, point_b_ids):
+            break  # Found a valid Point B
+        else:
+            # Redefine Point A as Point B and continue
+            point_a_vds, point_a_ids = point_b_vds, point_b_ids
+            vds_current, ids_current = vds_next, ids_next
+    else:
+        raise ValueError("Could not find a valid Point B in the available data.")
+
+    # Generate artificial curves between Point A and Point B
+    vgs_steps = np.linspace(current_curve, next_curve, num=20)
+    artificial_curves = []
+
+    for step, vgs_interpolated in enumerate(vgs_steps[1:], start=1):
+        alpha = step / len(vgs_steps)
+        vds_interpolated = np.linspace(0, vdd, len(vds_current))  # Generate Vds grid
+        ids_interpolated = (
+            (1 - alpha) * np.interp(vds_interpolated, vds_current, ids_current) +
+            alpha * np.interp(vds_interpolated, vds_next, ids_next)
+        )
+        artificial_curves.append((vgs_interpolated, vds_interpolated, ids_interpolated))
+
+    # Determine the last artificial curve in saturation region
+    vgs_critical = None
+    intersection_point = None
+    selected_curve = None
+
+    for vgs_interpolated, vds_interpolated, ids_interpolated in artificial_curves:
+        # Intersect with load line
+        def difference(vds):
+            ids_device = np.interp(vds, vds_interpolated, ids_interpolated)
+            ids_loadline = np.interp(vds, vds_load, ids_load)
+            return ids_device - ids_loadline
+
+        try:
+            result = root_scalar(difference, bracket=(0, vdd), method='brentq')
+            if result.converged:
+                vds_intersect = result.root
+                ids_intersect = np.interp(vds_intersect, vds_interpolated, ids_interpolated)
+
+                # Check if intersection point is in saturation
+                if vds_intersect >= (vgs_interpolated - vth):
+                    vgs_critical = vgs_interpolated
+                    intersection_point = (vds_intersect, ids_intersect)
+                    selected_curve = (vgs_interpolated, vds_interpolated, ids_interpolated)
+                else:
+                    break
+        except ValueError:
+            pass
+
+    if not selected_curve:
+        raise ValueError("No valid artificial curve found that remains in saturation.")
+
+    # Plot original curves
+    plt.figure(figsize=(10, 6))
+    for vgs, curve in sorted(data.items()):
+        plt.plot(curve['vds'], curve['ids'], label=f"Original Vgs = {vgs:.2f} V")
+
+    # Plot the selected artificial curve
+    vgs_interpolated, vds_interpolated, ids_interpolated = selected_curve
+    plt.plot(vds_interpolated, ids_interpolated, '--', label=f"Selected Artificial Vgs = {vgs_critical:.2f} V")
+
+    # Load line
+    plt.plot(vds_load, ids_load, 'r--', label="Load Line")
+
+    # Mark intersection point
+    if intersection_point:
+        plt.scatter([intersection_point[0]], [intersection_point[1]], color='orange', zorder=5,
+                    label=f"Critical Point (Vgs={vgs_critical:.2f}V, Vds={intersection_point[0]:.2f}V)")
+    
+    plt.xlabel('Vds (V)')
+    plt.ylabel('Ids (A)')
+    plt.title('Interpolated Vgs Curve and Load Line Intersection')
+    plt.legend(loc='upper right', fontsize='small', frameon=True)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    # Print critical values
+    print(f"Selected Artificial Curve:")
+    print(f"  Vgs = {vgs_critical:.2f} V")
+    print(f"  Vds = {intersection_point[0]:.2f} V")
+    print(f"  Ids = {intersection_point[1]:.2e} A")
+    
+    return vgs_critical, intersection_point
+
+
 
 
 # File path
@@ -257,3 +529,5 @@ q_point = get_operating_point(data)
 rd = calculate_rd_and_plot(data, q_point)
 vth = calculate_vth_from_curve(data, q_point[2])
 critical_vgs = estimate_max_vgs_before_triode(data, rd, vth, vdd=float(10))
+critical_vgs = calculate_max_vgs_with_loadline(data, rd, vth, 10, q_point)
+critical_vgs = calculate_max_vgs_with_loadline_focused(data, rd, vth, 10, q_point)
