@@ -1,3 +1,4 @@
 /.vscode
 *.CSV
 .venv
+venv
