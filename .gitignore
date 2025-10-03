@@ -2,3 +2,4 @@
 *.CSV
 .venv
 venv
+*.html

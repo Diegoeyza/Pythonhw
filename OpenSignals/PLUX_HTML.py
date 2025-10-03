@@ -7,8 +7,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # === File paths ===
-filename_csv = r"C:\Users\diego\Documents\OpenSignals (r)evolution\files\TestClinico1.1_2025-09-22_13-49-59_2025-09-22_14-00-31_2025-09-22_14-17-06_2025-09-22_14-17-26_csv_fNIRS_metrics.csv"
-filename_txt = r"C:\Users\diego\Documents\OpenSignals (r)evolution\files\Test1clinico3.txt"
+filename_csv = r"C:\Users\diego\Documents\OpenSignals (r)evolution\files\OpenSignals (r)evolution Report_2025-08-29_09-12-28_csv_fNIRS_metrics_Vandro1.csv"
+filename_txt = r"C:\Users\diego\Documents\OpenSignals (r)evolution\files\Test_FNIRS_Vandro_RCP1.txt"
+file_terminator = "_GT"
 
 # === Load CSV ===
 df = pd.read_csv(filename_csv, comment="#", sep="\s+", names=["Timestamps", "HbO", "HbR"])
@@ -66,9 +67,26 @@ fig_time.add_trace(go.Scatter(x=df["Timestamps"], y=df["SpO2_smooth"], mode="lin
 for idx, sensor in enumerate(unique_sensors, start=3):
     fig_time.add_trace(go.Scatter(x=df["Timestamps"], y=df[sensor] / 1200, mode="lines", name=sensor), row=idx, col=1)
 
+# Add vertical left-side labels
+subplot_labels = ["HbO / HbR", "SpO2 (smoothed)"] + unique_sensors
+for i, label in enumerate(subplot_labels, start=1):
+    fig_time.add_annotation(
+        text=label,
+        xref="paper",
+        yref="y"+str(i),
+        x=-0.04, y=0.5,
+        xanchor="right",
+        yanchor="middle",
+        textangle=-90,   # Vertical text
+        showarrow=False,
+        font=dict(size=12)
+    )
+
 fig_time.update_layout(height=300*n_plots, width=1200, title_text="Time-Domain Signals", showlegend=True)
-fig_time.write_html("time_domain_plots.html")  # Save to HTML
-print("Time-domain plots saved to 'time_domain_plots.html'")
+
+# Save with file terminator
+fig_time.write_html(f"time_domain_plots{file_terminator}.html")
+print(f"Time-domain plots saved to 'time_domain_plots{file_terminator}.html'")
 
 # === SPECTROGRAMS (Plotly) ===
 fig_spec = make_subplots(rows=len(unique_sensors), cols=1, shared_xaxes=True, vertical_spacing=0.02)
@@ -94,6 +112,22 @@ for i, sensor in enumerate(unique_sensors, start=1):
         row=i, col=1
     )
 
+# Add vertical left-side labels for spectrograms
+for i, sensor in enumerate(unique_sensors, start=1):
+    fig_spec.add_annotation(
+        text=sensor,
+        xref="paper",
+        yref="y"+str(i),
+        x=-0.03, y=0.5,
+        xanchor="right",
+        yanchor="middle",
+        textangle=-90,   # Vertical text
+        showarrow=False,
+        font=dict(size=12)
+    )
+
 fig_spec.update_layout(height=300*len(unique_sensors), width=1200, title_text="Spectrograms", showlegend=False)
-fig_spec.write_html("spectrograms.html")
-print("Spectrograms saved to 'spectrograms.html'")
+
+# Save with file terminator
+fig_spec.write_html(f"spectrograms{file_terminator}.html")
+print(f"Spectrograms saved to 'spectrograms{file_terminator}.html'")
